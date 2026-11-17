@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PRO CAR RACING - Scenic Route</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #87CEEB; touch-action: none; }
+        canvas { display: block; width: 100vw; height: 100vh; }
+        
+        /* UI Overlays */
+        #game-ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+        #speedometer { position: absolute; bottom: 30px; right: 30px; text-align: right; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); }
+        .speed-val { font-size: 3rem; font-weight: 900; font-style: italic; color: #fff; line-height: 1; }
+        .speed-unit { font-size: 1.2rem; font-weight: bold; color: #ff3333; }
+        
+        /* Mobile Controls */
+        #mobile-controls { position: absolute; bottom: 20px; left: 20px; width: calc(100% - 40px); display: flex; justify-content: space-between; pointer-events: auto; }
+        .ctrl-btn { width: 70px; height: 70px; background: rgba(0,0,0,0.4); border: 2px solid rgba(255,255,255,0.2); border-radius: 50%; color: white; display: flex; justify-content: center; align-items: center; font-weight: bold; user-select: none; backdrop-filter: blur(4px); }
+        .ctrl-btn:active { background: rgba(255, 51, 51, 0.6); border-color: #ff3333; }
+        @media (min-width: 768px) { #mobile-controls { display: none; } }
+
+        /* Main Menu Overlay (Simulating pages/login.php & garage.php) */
+        #menu-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.9)); z-index: 20; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; }
+    </style>
+</head>
+<body>
+
+    <!-- Menu Screen (Mewakili struktur file UI Anda) -->
+    <div id="menu-overlay">
+        <h1 class="text-5xl font-black italic text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-yellow-500 mb-2">PRO CAR RACING</h1>
+        <p class="text-gray-400 mb-8 tracking-widest">SCENIC AUTUMN ROUTE</p>
+        
+        <div class="bg-gray-800 p-6 rounded-lg border border-gray-700 w-80 mb-6 shadow-2xl">
+            <h2 class="text-xl font-bold mb-4 border-b border-gray-600 pb-2">GARAGE</h2>
+            <div class="flex justify-between items-center mb-2">
+                <span>Car:</span> <span class="text-red-400 font-bold">Veloce GT</span>
+            </div>
+            <div class="flex justify-between items-center mb-4">
+                <span>Track:</span> <span class="text-yellow-400 font-bold">Autumn Peak</span>
+            </div>
+            <p class="text-xs text-gray-500 italic">*Press W,A,S,D or Arrows to drive.</p>
+        </div>
+
+        <button id="start-btn" class="px-8 py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded shadow-[0_0_15px_rgba(220,38,38,0.6)] transition-all text-xl">
+            START ENGINE
+        </button>
+    </div>
+
+    <!-- Modals untuk Edukasi dan Game Over -->
+    <div id="level-complete-modal" class="absolute top-0 left-0 w-full h-full bg-black/80 z-[30] hidden flex-col justify-center items-center text-white px-4 text-center">
+        <h2 class="text-4xl font-black text-green-400 mb-2 italic">LEVEL COMPLETE!</h2>
+        <div class="bg-gray-800 border-2 border-cyan-500 p-6 rounded-lg max-w-md shadow-[0_0_20px_cyan]">
+            <h3 class="text-xl font-bold text-cyan-300 mb-3 border-b border-gray-600 pb-2">INFO INFORMATIKA KELAS 9 💡</h3>
+            <p id="trivia-text" class="text-gray-200 mb-6 leading-relaxed">Trivia goes here...</p>
+            <button id="next-level-btn" class="px-6 py-2 bg-cyan-600 hover:bg-cyan-500 font-bold rounded text-lg w-full transition-colors">
+                LANJUT KE LEVEL BERIKUTNYA
+            </button>
+        </div>
+    </div>
+
+    <div id="game-over-modal" class="absolute top-0 left-0 w-full h-full bg-red-900/90 z-[30] hidden flex-col justify-center items-center text-white px-4 text-center">
+        <h2 class="text-5xl font-black text-black drop-shadow-[0_0_10px_white] mb-2 italic">SYSTEM CRASH!</h2>
+        <p class="text-gray-200 mb-6 text-xl">Transmisi data gagal, paket data hancur terkena Malware.</p>
+        <button id="retry-btn" class="px-8 py-3 bg-white text-red-900 hover:bg-gray-200 font-black rounded text-xl shadow-lg transition-transform hover:scale-105">
+            RETRY LEVEL
+        </button>
+    </div>
+
+    <!-- In-Game UI -->
+    <div id="game-ui" style="display: none;">
+        
+        <!-- Top HUD (Level, Nyawa, Progress) -->
+        <div class="absolute top-4 left-4 right-4 flex justify-between pointer-events-none z-10">
+            <div class="bg-black/70 rounded px-4 py-2 border border-gray-600 backdrop-blur-sm text-white shadow-lg">
+                <div class="text-[10px] text-gray-400 font-bold tracking-widest uppercase" id="level-title">Transmisi Data</div>
+                <div class="text-lg font-black leading-tight">LVL <span id="ui-level" class="text-yellow-400">1</span> <span class="text-sm text-gray-400 font-normal">/5</span></div>
+                <div class="text-xl mt-1 tracking-widest" id="ui-lives">❤️❤️❤️</div>
+            </div>
+            
+            <div class="bg-black/70 rounded px-4 py-2 border border-gray-600 backdrop-blur-sm w-1/3 min-w-[140px] shadow-lg flex flex-col justify-center">
+                <div class="text-[10px] text-gray-400 mb-1 font-bold tracking-widest">DATA TRANSMISSION</div>
+                <div class="w-full bg-gray-800 rounded-full h-3 border border-gray-700">
+                    <div id="ui-progress" class="bg-gradient-to-r from-cyan-500 to-blue-500 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Modern (Menggabungkan Camera, Gear, dan Speedometer) -->
+        <div id="dashboard" class="absolute bottom-5 right-5 bg-black/80 border-2 border-gray-700 rounded-xl p-4 flex flex-col items-center pointer-events-auto shadow-[0_0_20px_rgba(0,0,0,0.8)] backdrop-blur-md">
+            
+            <!-- Tombol Ganti Kamera -->
+            <button id="cam-btn" class="mb-3 px-4 py-1 bg-gray-800 hover:bg-gray-600 border border-gray-500 rounded text-xs text-gray-300 font-bold tracking-widest transition-colors">
+                CAM: OUTSIDE
+            </button>
+            
+            <!-- Indikator Gear (Gaya Odometer) -->
+            <div id="gear-indicator" class="flex gap-4 text-2xl font-mono font-black mb-1 cursor-pointer">
+                <span id="gear-1" class="gear-lbl text-gray-600 transition-all" onclick="setGear('1')">1</span>
+                <span id="gear-2" class="gear-lbl text-gray-600 transition-all" onclick="setGear('2')">2</span>
+                <span id="gear-3" class="gear-lbl text-red-500 drop-shadow-[0_0_10px_red] scale-125 transition-all" onclick="setGear('3')">3</span>
+            </div>
+            <div class="text-[0.6rem] text-gray-500 mb-2 tracking-widest">GEAR (SHIFT)</div>
+            
+            <!-- Speedometer -->
+            <div class="text-center bg-gray-900 w-full rounded-lg py-2 border border-gray-800 border-t-gray-600">
+                <div class="speed-val text-5xl font-black italic text-cyan-400 font-mono drop-shadow-[0_0_10px_cyan]" id="speed">000</div>
+                <div class="speed-unit text-xs text-gray-400 tracking-widest mt-1">KM/H</div>
+            </div>
+            
+            <div class="text-[10px] text-gray-500 mt-3 hidden md:block">Press 'C' to change view</div>
+        </div>
+        
+        <div id="mobile-controls">
+            <div class="flex gap-4">
+                <div class="ctrl-btn" id="btn-left">◄</div>
+                <div class="ctrl-btn" id="btn-right">►</div>
+            </div>
+            <div class="flex gap-4">
+                <div class="ctrl-btn" id="btn-brake">BRAKE</div>
+                <div class="ctrl-btn" id="btn-gas">GAS</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        // ==========================================
+        // MODULE: engine.js & camera.js
+        // ==========================================
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB); // Langit biru cerah
+        scene.fog = new THREE.FogExp2(0x87CEEB, 0.003); // Kabut pegunungan
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        // Lighting
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+        hemiLight.position.set(0, 200, 0);
+        scene.add(hemiLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(100, 100, 50);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
+        dirLight.shadow.camera.near = 0.5;
+        dirLight.shadow.camera.far = 500;
+        const d = 100;
+        dirLight.shadow.camera.left = -d;
+        dirLight.shadow.camera.right = d;
+        dirLight.shadow.camera.top = d;
+        dirLight.shadow.camera.bottom = -d;
+        scene.add(dirLight);
+
+        // ==========================================
+        // MODULE: track.js (Environment & Road)
+        // ==========================================
+        const environmentObjects = [];
+
+        // 1. Texture Generator untuk Jalan Raya (Double Yellow Line)
+        function createRoadTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            
+            // Aspal
+            ctx.fillStyle = '#333333';
+            ctx.fillRect(0, 0, 512, 512);
+            
+            // Noise aspal (sederhana)
+            for(let i=0; i<1000; i++) {
+                ctx.fillStyle = Math.random() > 0.5 ? '#2a2a2a' : '#3a3a3a';
+                ctx.fillRect(Math.random()*512, Math.random()*512, 2, 2);
+            }
+
+            // Garis Tepi Putih
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(20, 0, 10, 512);
+            ctx.fillRect(482, 0, 10, 512);
+
+            // Garis Ganda Kuning Tengah
+            ctx.fillStyle = '#ffcc00';
+            ctx.fillRect(245, 0, 8, 512);
+            ctx.fillRect(259, 0, 8, 512);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(1, 100); // Repeat sepanjang jalan
+            return texture;
+        }
+
+        // Buat Jalan
+        const roadGeo = new THREE.PlaneGeometry(40, 20000); // Jalan panjang
+        const roadMat = new THREE.MeshStandardMaterial({ 
+            map: createRoadTexture(),
+            roughness: 0.8,
+            metalness: 0.1
+        });
+        const road = new THREE.Mesh(roadGeo, roadMat);
+        road.rotation.x = -Math.PI / 2;
+        road.receiveShadow = true;
+        scene.add(road);
+
+        // Buat Tanah (Terrain)
+        const groundGeo = new THREE.PlaneGeometry(2000, 20000);
+        const groundMat = new THREE.MeshStandardMaterial({ color: 0x2d4c1e, roughness: 1 });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.y = -0.1;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // Generator Pohon Musim Gugur
+        function createTree(x, z, type) {
+            const treeGroup = new THREE.Group();
+            
+            // Batang
+            const trunkGeo = new THREE.CylinderGeometry(0.5, 0.8, 4, 7);
+            const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4a3728 });
+            const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+            trunk.position.y = 2;
+            trunk.castShadow = true;
+            treeGroup.add(trunk);
+
+            // Daun
+            const leavesGeo = new THREE.DodecahedronGeometry(3.5, 1);
+            let leafColor = 0xcc3333; // Default Merah (Sesuai referensi foto)
+            if(type === 1) leafColor = 0xccaa00; // Kuning/Orange
+            if(type === 2) leafColor = 0x226622; // Hijau
+
+            const leavesMat = new THREE.MeshStandardMaterial({ color: leafColor, roughness: 0.9 });
+            const leaves = new THREE.Mesh(leavesGeo, leavesMat);
+            leaves.position.y = 5.5;
+            leaves.castShadow = true;
+            
+            // Acak bentuk daun sedikit
+            leaves.scale.set(1 + Math.random()*0.5, 1 + Math.random()*0.5, 1 + Math.random()*0.5);
+            treeGroup.add(leaves);
+
+            treeGroup.position.set(x, 0, z);
+            scene.add(treeGroup);
+            environmentObjects.push(treeGroup);
+        }
+
+        // Tanam pohon di sepanjang jalan
+        for (let i = -500; i < 500; i += 20) {
+            if (Math.abs(i) < 20) continue; // Kosongkan area start
+            
+            // Kiri jalan
+            if (Math.random() > 0.3) {
+                createTree(-25 - Math.random() * 50, i * 10, Math.floor(Math.random() * 3));
+            }
+            // Kanan jalan
+            if (Math.random() > 0.3) {
+                createTree(25 + Math.random() * 50, i * 10, Math.floor(Math.random() * 3));
+            }
+        }
+
+        // ==========================================
+        // MODULE: car-controller.js
+        // ==========================================
+        
+        // Membangun Mobil Sport Sederhana menggunakan Primitives
+        const car = new THREE.Group();
+        
+        const bodyMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.2, metalness: 0.8 }); // Dark grey/black body
+        const detailMat = new THREE.MeshStandardMaterial({ color: 0xff0000, roughness: 0.3, metalness: 0.5 }); // Red decals
+        
+        // Material kaca dibuat transparan agar pandangan dari dalam mobil tidak terhalang
+        const glassMat = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.1, metalness: 0.9, transparent: true, opacity: 0.4 });
+
+        // Sasis Bawah
+        const chassis = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.6, 5), bodyMat);
+        chassis.position.y = 0.5;
+        chassis.castShadow = true;
+        car.add(chassis);
+
+        // Kabin/Kaca Atas
+        const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.6, 2.5), glassMat);
+        cabin.position.set(0, 1.1, -0.2);
+        cabin.castShadow = true;
+        car.add(cabin);
+
+        // Spoiler Belakang (Sayap)
+        const spoilerStandL = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.4, 0.2), bodyMat);
+        spoilerStandL.position.set(-0.8, 0.9, -2.2);
+        car.add(spoilerStandL);
+        const spoilerStandR = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.4, 0.2), bodyMat);
+        spoilerStandR.position.set(0.8, 0.9, -2.2);
+        car.add(spoilerStandR);
+        const spoilerWing = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.1, 0.6), detailMat);
+        spoilerWing.position.set(0, 1.1, -2.3);
+        spoilerWing.castShadow = true;
+        car.add(spoilerWing);
+
+        // Lampu Belakang (Knalpot/Lampu)
+        const tailLight = new THREE.Mesh(new THREE.BoxGeometry(2, 0.2, 0.1), detailMat);
+        tailLight.position.set(0, 0.6, -2.5);
+        car.add(tailLight);
+
+        // Roda
+        const wheelGeo = new THREE.CylinderGeometry(0.45, 0.45, 0.4, 24);
+        const tireMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
+        const rimMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 1 });
+        
+        const wheels = [];
+        const wheelPos = [
+            [-1.2, 0.45, 1.5],  // Depan Kiri
+            [ 1.2, 0.45, 1.5],  // Depan Kanan
+            [-1.2, 0.45, -1.6], // Belakang Kiri
+            [ 1.2, 0.45, -1.6]  // Belakang Kanan
+        ];
+
+        wheelPos.forEach(pos => {
+            const wheelGroup = new THREE.Group();
+            
+            const tire = new THREE.Mesh(wheelGeo, tireMat);
+            tire.rotation.z = Math.PI / 2;
+            tire.castShadow = true;
+            
+            const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.42, 8), rimMat);
+            rim.rotation.z = Math.PI / 2;
+
+            wheelGroup.add(tire);
+            wheelGroup.add(rim);
+            wheelGroup.position.set(...pos);
+            car.add(wheelGroup);
+            wheels.push(wheelGroup);
+        });
+
+        scene.add(car);
+
+        // ==========================================
+        // MODULE: physics.js, input.js & obstacles.js
+        // ==========================================
+        const physics = {
+            force: new THREE.Vector3(),
+            velocity: new THREE.Vector3(),
+            acceleration: 0.045, // Setelan awal di Gear 3
+            braking: 0.015,
+            friction: 0.98,
+            turnSpeed: 0.035,
+            maxSpeed: 2.3
+        };
+
+        // Kontrol Input Keyboard
+        const keys = { forward: false, backward: false, left: false, right: false };
+
+        window.addEventListener('keydown', (e) => {
+            if(e.key === 'ArrowUp' || e.key.toLowerCase() === 'w') keys.forward = true;
+            if(e.key === 'ArrowDown' || e.key.toLowerCase() === 's') keys.backward = true;
+            if(e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') keys.left = true;
+            if(e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') keys.right = true;
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if(e.key === 'ArrowUp' || e.key.toLowerCase() === 'w') keys.forward = false;
+            if(e.key === 'ArrowDown' || e.key.toLowerCase() === 's') keys.backward = false;
+            if(e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') keys.left = false;
+            if(e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') keys.right = false;
+        });
+
+        // Kontrol Input Sentuh (Mobile)
+        const addTouch = (id, key) => {
+            const btn = document.getElementById(id);
+            if(btn) {
+                btn.addEventListener('touchstart', (e) => { e.preventDefault(); keys[key] = true; });
+                btn.addEventListener('touchend', (e) => { e.preventDefault(); keys[key] = false; });
+            }
+        };
+        addTouch('btn-gas', 'forward');
+        addTouch('btn-brake', 'backward');
+        addTouch('btn-left', 'left');
+        addTouch('btn-right', 'right');
+
+        // ==========================================
+        // MODULE: level-system & obstacles.js
+        // ==========================================
+        const levelData = [
+            { id: 1, dist: 3000, obsCount: 30, speedMin: 0.15, speedMax: 0.3, title: "Algoritma Dasar", trivia: "Tahukah kamu? Algoritma adalah urutan langkah logis untuk menyelesaikan masalah. Sama seperti rute optimal yang kamu ambil untuk menghindari tabrakan!" },
+            { id: 2, dist: 4500, obsCount: 45, speedMin: 0.25, speedMax: 0.45, title: "Topologi Jaringan", trivia: "Dalam Jaringan Komputer, data dikirim dalam bentuk 'Paket'. Jika terjadi tabrakan data (Collision), paket harus dikirim ulang. Hati-hati di jalan!" },
+            { id: 3, dist: 6000, obsCount: 65, speedMin: 0.35, speedMax: 0.6, title: "Keamanan Siber", trivia: "Waspada! Rintangan di level ini diibaratkan sebagai Malware (Virus, Trojan, Ransomware). Selalu pasang 'Firewall' dan hindari lalu lintas berbahaya." },
+            { id: 4, dist: 8000, obsCount: 85, speedMin: 0.45, speedMax: 0.8, title: "Berpikir Komputasional", trivia: "Berpikir Komputasional melatih kita memecahkan masalah rumit (Dekomposisi) dan fokus pada hal penting (Abstraksi). Temukan celah di tengah kemacetan!" },
+            { id: 5, dist: 12000, obsCount: 110, speedMin: 0.6, speedMax: 1.0, title: "Dampak Sosial TIK", trivia: "SELAMAT! Kamu telah menguasai transmisi data tingkat tinggi. Di dunia nyata, selalu perhatikan etika digital, hindari hoax, dan gunakan internet secara bijak." }
+        ];
+
+        let currentLevel = 1;
+        let lives = 3;
+        let startZ = 0;
+        let isInvulnerable = false;
+        let obstacleCars = [];
+        
+        const obsGeo = new THREE.BoxGeometry(2.2, 1.2, 4.5);
+        const obsColors = [0x223344, 0x552222, 0x225522, 0xaaaaaa, 0x773300];
+
+        function spawnObstacles() {
+            // Hapus obstacle lama jika ada
+            obstacleCars.forEach(obs => scene.remove(obs.mesh));
+            obstacleCars = [];
+
+            const config = levelData[currentLevel - 1];
+            
+            for (let i = 0; i < config.obsCount; i++) {
+                const obsMat = new THREE.MeshStandardMaterial({ color: obsColors[i % obsColors.length], roughness: 0.5 });
+                const obs = new THREE.Mesh(obsGeo, obsMat);
+                
+                // 3 Jalur: Kiri (-6), Tengah (0), Kanan (6)
+                const lane = (Math.floor(Math.random() * 3) - 1) * 6;
+                
+                // Posisi Z disebar dari depan pemain hingga jarak target level
+                const zSpread = (config.dist * 0.95); 
+                obs.position.set(lane, 0.6, car.position.z + 100 + (Math.random() * zSpread));
+                obs.castShadow = true;
+                scene.add(obs);
+                
+                obstacleCars.push({ 
+                    mesh: obs, 
+                    speed: config.speedMin + Math.random() * (config.speedMax - config.speedMin)
+                });
+            }
+        }
+
+        function updateHUD() {
+            document.getElementById('ui-level').innerText = currentLevel;
+            document.getElementById('level-title').innerText = levelData[currentLevel-1].title;
+            let hearts = "";
+            for(let i=0; i<lives; i++) hearts += "❤️";
+            for(let i=lives; i<3; i++) hearts += "🖤";
+            document.getElementById('ui-lives').innerText = hearts;
+        }
+
+        function initLevel() {
+            lives = 3;
+            startZ = car.position.z;
+            physics.velocity.set(0,0,0);
+            updateHUD();
+            spawnObstacles();
+            document.getElementById('ui-progress').style.width = "0%";
+            gameActive = true;
+        }
+
+        // ==========================================
+        // MODULE: transmission.js & camera-state.js
+        // ==========================================
+        const gearSettings = {
+            '1': { maxSpeed: 1.0, acceleration: 0.02 },  
+            '2': { maxSpeed: 1.6, acceleration: 0.035 }, 
+            '3': { maxSpeed: 2.3, acceleration: 0.045 }  
+        };
+
+        let currentGear = 3; 
+
+        // State Kamera
+        const cameraModes = ['outside', 'inside', 'top'];
+        let currentCamIndex = 0; // 0: outside
+
+        function switchCamera() {
+            currentCamIndex = (currentCamIndex + 1) % cameraModes.length;
+            document.getElementById('cam-btn').innerText = "CAM: " + cameraModes[currentCamIndex].toUpperCase();
+        }
+
+        document.getElementById('cam-btn').addEventListener('click', switchCamera);
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key.toLowerCase() === 'c') switchCamera();
+        });
+
+        // Fungsi terpusat untuk mengganti transmisi
+        window.setGear = function(mode) {
+            currentGear = parseInt(mode);
+            
+            // Update UI Odometer Gear
+            [1, 2, 3].forEach(g => {
+                const el = document.getElementById('gear-' + g);
+                if(g === currentGear) {
+                    el.className = "gear-lbl text-red-500 drop-shadow-[0_0_10px_red] scale-125 transition-all";
+                } else {
+                    el.className = "gear-lbl text-gray-600 scale-100 transition-all";
+                }
+            });
+            
+            // Update mesin mobil
+            physics.maxSpeed = gearSettings[mode].maxSpeed;
+            physics.acceleration = gearSettings[mode].acceleration;
+        }
+
+        // Event Listener khusus untuk Shortcut Tombol Shift di Keyboard
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Shift') {
+                let nextGear = currentGear + 1;
+                if (nextGear > 3) nextGear = 1;
+                setGear(nextGear.toString());
+            }
+        });
+
+        // ==========================================
+        // MODULE: racing.js (Game Loop)
+        // ==========================================
+        let gameActive = false;
+        const uiSpeed = document.getElementById('speed');
+
+        document.getElementById('start-btn').addEventListener('click', () => {
+            document.getElementById('menu-overlay').style.display = 'none';
+            document.getElementById('game-ui').style.display = 'block';
+            initLevel();
+        });
+
+        // Event Modal Lanjut & Retry
+        document.getElementById('next-level-btn').addEventListener('click', () => {
+            document.getElementById('level-complete-modal').style.display = 'none';
+            currentLevel++;
+            if(currentLevel > 5) {
+                alert("LUAR BIASA! Anda telah menamatkan seluruh kurikulum Informatika!");
+                currentLevel = 1; // Reset game
+            }
+            initLevel();
+        });
+
+        document.getElementById('retry-btn').addEventListener('click', () => {
+            document.getElementById('game-over-modal').style.display = 'none';
+            // Mundurkan posisi mobil sedikit agar tidak spawn di dalam rintangan
+            car.position.z = Math.max(0, car.position.z - 200); 
+            initLevel();
+        });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Loop
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (gameActive) {
+                // Fisika Vektor Dasar
+                const direction = new THREE.Vector3();
+                car.getWorldDirection(direction);
+
+                physics.force.set(0, 0, 0);
+                if (keys.forward) physics.force.add(direction.clone().multiplyScalar(physics.acceleration));
+                if (keys.backward) physics.force.add(direction.clone().multiplyScalar(-physics.braking));
+
+                physics.velocity.add(physics.force);
+                
+                if (physics.velocity.length() > physics.maxSpeed) {
+                    physics.velocity.normalize().multiplyScalar(physics.maxSpeed);
+                }
+
+                physics.velocity.multiplyScalar(physics.friction);
+                car.position.add(physics.velocity);
+
+                const currentSpeed = physics.velocity.length();
+
+                // Kemudi (Steering)
+                if (currentSpeed > 0.02) {
+                    const moveSign = physics.velocity.dot(direction) > 0 ? 1 : -1;
+                    let turnMultiplier = 1 - (currentSpeed / physics.maxSpeed * 0.5); // Lebih cepat = lebih susah belok tajam
+                    
+                    if (keys.left) {
+                        car.rotation.y += physics.turnSpeed * turnMultiplier * moveSign;
+                        wheels[0].rotation.y = 0.4; wheels[1].rotation.y = 0.4;
+                    } else if (keys.right) {
+                        car.rotation.y -= physics.turnSpeed * turnMultiplier * moveSign;
+                        wheels[0].rotation.y = -0.4; wheels[1].rotation.y = -0.4;
+                    } else {
+                        wheels[0].rotation.y = 0; wheels[1].rotation.y = 0;
+                    }
+                }
+
+                // Rotasi roda
+                wheels.forEach(w => w.children[0].rotation.x -= currentSpeed * 0.5);
+                wheels.forEach(w => w.children[1].rotation.x -= currentSpeed * 0.5);
+
+                // --- PROGRESS TRANSMISI DATA ---
+                const config = levelData[currentLevel-1];
+                let travelled = car.position.z - startZ;
+                let progressPercent = Math.max(0, Math.min(100, (travelled / config.dist) * 100));
+                document.getElementById('ui-progress').style.width = progressPercent + "%";
+
+                if (progressPercent >= 100 && gameActive) {
+                    gameActive = false;
+                    document.getElementById('trivia-text').innerText = config.trivia;
+                    document.getElementById('level-complete-modal').style.display = 'flex';
+                    if (currentLevel === 5) {
+                        document.getElementById('next-level-btn').innerText = "SELESAIKAN GAME";
+                    }
+                }
+
+                // --- LOGIKA MOBIL RINTANGAN (NPC) & TABRAKAN ---
+                obstacleCars.forEach(npc => {
+                    // Gerakkan NPC maju searah jalan
+                    npc.mesh.position.z += npc.speed;
+                    
+                    // Reposisi NPC jika terlewat jauh di belakang agar efisien
+                    if (car.position.z - npc.mesh.position.z > 50) {
+                        npc.mesh.position.z = car.position.z + 200 + Math.random() * 300;
+                    }
+                    
+                    // Deteksi Tabrakan Sederhana (AABB Box Collision)
+                    if (gameActive && !isInvulnerable && 
+                        Math.abs(car.position.z - npc.mesh.position.z) < 5.0 && 
+                        Math.abs(car.position.x - npc.mesh.position.x) < 2.2) {
+                        
+                        lives--;
+                        updateHUD();
+                        
+                        // Efek Tabrakan: Kecepatan drastis berkurang & terpental mundur
+                        physics.velocity.multiplyScalar(0.1); 
+                        physics.velocity.z -= 0.5; 
+                        
+                        // Flash layar merah
+                        document.getElementById('game-ui').style.boxShadow = "inset 0 0 100px red";
+                        setTimeout(() => document.getElementById('game-ui').style.boxShadow = "none", 150);
+
+                        if (lives <= 0) {
+                            gameActive = false;
+                            document.getElementById('game-over-modal').style.display = 'flex';
+                        } else {
+                            // Aktifkan masa kebal (Invulnerability) 2 detik
+                            isInvulnerable = true;
+                            let blinkCount = 0;
+                            let blinkInterval = setInterval(() => {
+                                car.visible = !car.visible;
+                                blinkCount++;
+                                if(blinkCount > 12) {
+                                    clearInterval(blinkInterval);
+                                    car.visible = true;
+                                    isInvulnerable = false;
+                                }
+                            }, 150);
+                        }
+                    }
+                });
+
+                // Update UI Speed (Maksimum 2.3 * 100 = 230 KM/H)
+                uiSpeed.innerText = Math.floor(currentSpeed * 100).toString().padStart(3, '0');
+
+                // Dynamic Camera Berdasarkan Mode View
+                const mode = cameraModes[currentCamIndex];
+                
+                // Atur FOV (hanya meluas tajam jika di luar, agar di dalam mobil tidak pusing)
+                const baseFOV = mode === 'inside' ? 75 : 60;
+                const targetFOV = baseFOV + (mode === 'top' ? 0 : currentSpeed * 15);
+                camera.fov += (targetFOV - camera.fov) * 0.1;
+                camera.updateProjectionMatrix();
+
+                // Tentukan Posisi Offset Kamera berdasarkan Mode
+                let camOffset;
+                if (mode === 'outside') {
+                    camOffset = new THREE.Vector3(0, 2.5, -8); // Di belakang & atas
+                } else if (mode === 'inside') {
+                    camOffset = new THREE.Vector3(0, 1.25, 0.4); // Di posisi pengemudi/kaca depan
+                } else if (mode === 'top') {
+                    camOffset = new THREE.Vector3(0, 15, -2); // Dari atas burung
+                }
+
+                // Kalkulasi & Terapkan pergerakan mulus (Lerp)
+                const targetCamPos = camOffset.applyMatrix4(car.matrixWorld);
+                camera.position.lerp(targetCamPos, mode === 'inside' ? 0.3 : 0.15); // Di dalam harus lebih kaku ikut mobil
+                
+                // Arah pandang kamera
+                if (mode === 'top') {
+                    // Jika dari atas, lihat ke arah jalanan di depan mobil
+                    const lookAtPos = car.position.clone().add(direction.multiplyScalar(5));
+                    camera.lookAt(lookAtPos);
+                } else {
+                    // Jika dari luar / dalam, lihat lurus ke horizon mobil
+                    const lookAtPos = car.position.clone().add(direction.multiplyScalar(20));
+                    lookAtPos.y += (mode === 'inside' ? 1.2 : 0);
+                    camera.lookAt(lookAtPos);
+                }
+
+                // Update posisi cahaya matahari agar selalu mengikuti mobil
+                dirLight.position.x = car.position.x + 100;
+                dirLight.position.z = car.position.z + 50;
+                dirLight.target = car;
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        animate();
+    </script>
+</body>
+</html>
